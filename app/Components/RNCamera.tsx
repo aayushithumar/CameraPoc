@@ -1,186 +1,204 @@
-import React, { ReactNode, forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import React, {PureComponent} from "react"
 import { Text, View, ViewStyle } from "react-native";
-import { Camera, CameraDevice, CameraPosition, CameraRuntimeError, PhotoFile, VideoFile, useCameraDevice } from "react-native-vision-camera";
-import { usePreferredCameraDevice } from "./hooks/usePreferredCameraDevice";
-import { useIsForeground } from "./hooks/useIsForeground";
-
-interface IRNCamera {
+import { Camera, CameraDevice, CameraPosition, CameraRuntimeError } from "react-native-vision-camera";
+interface IRNCamera<T> {
     cameraFacing?: CameraPosition
     style?: ViewStyle
     uri?: string
-    setRef?: Function;
-    recordVideo?: (video:any)=>void;
-    stopRecording?: (error:any)=>void;
+    setRef?: any;
+    isCameraInitialized?: boolean;
+    isRecording?: boolean;
+    cameraPosition?: 'front' | 'back';
+    permissionGranted?:boolean
 }
-// // Define the props interface with forwardRef
-// interface IRNCameraWithRef<T> extends IRNCamera<T> {
-//     // Forwarded ref
-//     forwardedRef?: any;
-// }
-const RNCamera = (props: IRNCamera) => {
+interface IRNCameraWithRef extends IRNCamera<Camera> {
+    // Forwarded ref
+    forwardedRef?: any;
+}
+interface IRNCameraState {
+    isCameraInitialized?: boolean;
+    isRecording?: boolean;
+    cameraPosition?: 'front' | 'back';
+    permissionGranted?:boolean
+}
+class RNCamera extends PureComponent<IRNCameraWithRef, IRNCameraState> {
+    constructor(props: IRNCameraWithRef) {
+        super(props);
+        this.state = {
+            permissionGranted: false,
+            isRecording: false,
+            isCameraInitialized: false
+        };
+        
+        this.availableDevices = Camera.getAvailableCameraDevices()
+        this.camera = React.createRef<Camera>();
+        this.device = this.availableDevices.find((d) => d.position === 'back') as CameraDevice;
 
-    const camera = useRef<Camera>(null)
-    const [isCameraInitialized, setIsCameraInitialized] = useState(false)
-    const hasMicrophonePermission = useMemo(() => Camera.getMicrophonePermissionStatus() === 'granted', [])
+    }
+    // Destructure props
+    // let { forwardedRef, ...rest } = props;
+    private camera: React.RefObject<Camera>;
 
+    // private hasMicrophonePermission = useMemo(() => Camera.getMicrophonePermissionStatus() === 'granted', [])
     // check if camera page is active
-    const isForeground = useIsForeground()
-    const isActive = isForeground
-
-    const [cameraPosition, setCameraPosition] = useState<'front' | 'back'>('front')
-    const [preferredDevice] = usePreferredCameraDevice()
-    const [isRecording, setIsRecording] = useState(false)
-
-    let device = useCameraDevice(cameraPosition)
-    if (preferredDevice != null && preferredDevice.position === cameraPosition) {
-        // override default device with the one selected by the user in settings
-        device = preferredDevice
-    } else {
-        const availableDevices = Camera.getAvailableCameraDevices()
-        device = availableDevices.find((d)=> d.position === 'back');
+    // private isForeground = useIsForeground()
+    private availableDevices : CameraDevice[];
+    private device : CameraDevice
+    
+    componentDidMount(): void {
+        this.setupCamera()
     }
 
-    async function record(){
-            console.log('record...')
+    record() {
+        console.log('record...')
     }
-    const onError = useCallback((error: CameraRuntimeError) => {
+
+    onError = (error: CameraRuntimeError) => {
         console.error(error)
         return true;
-    }, [])
-    const onInitialized = useCallback(() => {
+    }
+
+    onInitialized = () => {
         console.log('Camera initialized!')
-        setIsCameraInitialized(true)
-    }, [])
+        this.setState({ ...this.state, isCameraInitialized: true })
+    }
 
-    //   const onMediaCaptured = useCallback(
-    //     (media: PhotoFile | VideoFile, type: 'photo' | 'video') => {
-    //       console.log(`Media captured! ${JSON.stringify(media)}`)
-
-    //     },
-    //     [navigation],
-    //   )
-
-    const [state, setState] = useState({
-        permissionGranted: false
-    })
-
-    useEffect(() => {
-        const setupCamera = async () => {
-            try {
-                const hasCameraPermission = await Camera.getCameraPermissionStatus();
-                if (hasCameraPermission === 'granted') {
-                    setState({ ...state, permissionGranted: true });
-                } else {
-                    const requestPermissionResult = await Camera.requestCameraPermission();
-                    if (requestPermissionResult === 'granted') {
-                        setState({ ...state, permissionGranted: true });
-                    } else {
-                        console.error('Camera permission denied');
-                        setState({ ...state, permissionGranted: false });
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to setup camera:', error);
-                setState({ ...state, permissionGranted: false });
-            }
-        };
-        setupCamera();
-
-        return () => {
-            // Clean up any resources if necessary
-        };
-    }, []);
-
-
-    const toggleFacing = async () => {
+    async setupCamera() {
         try {
-            if (camera.current) {
-                const currentCamera = camera.current.props.device.position
+            const hasCameraPermission = await Camera.getCameraPermissionStatus();
+            if (hasCameraPermission === 'granted') {
+                this.setState({ ...this.state, permissionGranted: true });
+            } else {
+                const requestPermissionResult = await Camera.requestCameraPermission();
+                if (requestPermissionResult === 'granted') {
+                    this.setState({ ...this.state, permissionGranted: true });
+                } else {
+                    console.error('Camera permission denied');
+                    this.setState({ ...this.state, permissionGranted: false });
+                }
+            }
+        } catch (error) {
+            console.error('Failed to setup camera:', error);
+            this.setState({ ...this.state, permissionGranted: false });
+        }
+    };
+
+    toggleFacing = async () => {
+        try {
+            if (this.camera.current) {
+                const currentCamera = this.camera.current.props.device.position
                 const newCamera = currentCamera === 'front' ? 'back' : 'front';
-                camera.current.props.device.position = newCamera;
+                this.camera.current.props.device.position = newCamera;
             }
         } catch (error) {
             console.error('Failed to toggle camera:', error);
         }
     };
 
-    const recordVideo = async (): Promise<any> => {
+    recordVideo = async (camera: Camera): Promise<any> => {
         return await new Promise((resolve, reject) => {
-            if (camera.current && !isRecording) {
+            if (camera && !this.state.isRecording) {
                 console.log("recording....")
-                setIsRecording(true)
-                camera.current.startRecording({
+                this.setState({ ...this.state, isRecording: true })
+                camera.startRecording({
                     onRecordingFinished: (video) => {
                         resolve(video)
-                        setIsRecording(false)
+                        this.setState({ ...this.state, isRecording: false })
                     },
                     onRecordingError: (error) => {
                         console.log(error)
                         reject(error)
-                        setIsRecording(false)
+                        this.setState({ ...this.state, isRecording: false })
                     },
                 })
-                // setState({ ...state, isRecording: true });
+                // this.setState({ ...this.state, isRecording: true });
                 console.log("recording....2")
-                // camera.current.startRecording({onRecordingFinished,onRecordingError}); // Specify recording options if needed
+                // this.camera.current.startRecording({onRecordingFinished,onRecordingError}); // Specify recording options if needed
             } else {
-                reject(isRecording ? "Camera is in recording mode" : "Camera not ready")
-                // setState({ ...state, isRecording: false });
+                reject(this.state.isRecording ? "Camera is in recording mode" : "Camera not ready")
+                // this.setState({ ...this.state, isRecording: false });
                 console.log("recording....3")
             }
         });
     };
 
-    const stopRecording = async () => {
+    stopRecording = async () => {
         try {
             console.log("recording.... stoping...")
-            if (camera.current && isRecording) {
-                setIsRecording(false)
-                camera.current.stopRecording();
-                // setState({ ...state, isRecording: false });
+            if (this.camera.current && this.state.isRecording) {
+                this.setState({ ...this.state, isRecording: false })
+                this.camera.current.stopRecording();
+                // this.setState({ ...this.state, isRecording: false });
                 console.log("recording.... stopped")
             }
         } catch (error) {
             console.error('Failed to stop recording:', error);
         }
     };
-    const takePhoto = async () => {
+    takePhoto = async () => {
         try {
-            if (camera.current) {
-                return await camera.current.takePhoto();
+            if (this.camera.current) {
+                return await this.camera.current.takePhoto();
             }
         } catch (error) {
             console.error('Failed to stop recording:', error);
         }
         return undefined;
     };
-
-    const RenderCamera = () => {
-        return <View style={{flex:1}}>
+    RenderCamera = () => {
+        return <View style={{ flex: 1 }}>
             {
-                (state.permissionGranted && device) ? <Camera
-                    ref={camera}
-                    style={{...props.style && props.style, flex:1}}
-                    device={device}
+                (this.state.permissionGranted && this.device) ? <Camera
+                    ref={this.props.forwardedRef || this.camera}
+                    style={{ ...(this.props.style && this.props.style), flex: 1 }}
+                    device={this.device}
                     isActive={true}
                     video={true}
                     photo={true}
-                    onInitialized={onInitialized}
-                    onError={onError}
-                /> : <RenderAwaiting />
+                    onInitialized={this.onInitialized}
+                    onError={this.onError}
+                /> : <this.RenderAwaiting />
             }
+            {/* <RenderRecordButton /> */}
         </View>
     }
-    const RenderAwaiting = () => {
+    RenderAwaiting = () => {
         return <View>
             <Text>Error Loading Camera...</Text>
         </View>
     }
 
-    return (
-        <>
-            <RenderCamera />
-        </>
-    )
+    // const RenderRecordButton = () => {
+
+    //     return <>
+    //         <TouchableOpacity style={{
+    //             width: 100, height: 50, position: 'absolute',
+    //             bottom: 0,
+    //             left: '50%', // Centers the view horizontally
+    //             transform: [{ translateX: -50 }], // Adjusts for half of the width of the view
+    //         }} onPress={async () => {
+    //             if (!isRecording) {
+    //                 let video = await recordVideo().catch((error) => onVideoError(error))
+    //                 if (video) {
+    //                     onVideo(video);
+    //                 }
+    //             } else {
+    //                 await stopRecording()
+    //             }
+
+
+    //         }}>{isRecording ? <StopRecordButton /> : <RecordButton />}</TouchableOpacity>
+    //     </>
+
+    // }
+    render() {
+        return (
+            <>
+                <this.RenderCamera />
+
+            </>
+        )
+    }
+
 };
-export default RNCamera;
+export default RNCamera
