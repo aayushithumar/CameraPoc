@@ -33,7 +33,7 @@ class RNCamera extends PureComponent<IRNCameraWithRef, IRNCameraState> {
         this.availableDevices = Camera.getAvailableCameraDevices()
         this.camera = React.createRef<Camera>();
         this.device = this.availableDevices.find((d) => d.position === 'back') as CameraDevice;
-
+        console.log('constructor')
     }
     // Destructure props
     // let { forwardedRef, ...rest } = props;
@@ -46,6 +46,7 @@ class RNCamera extends PureComponent<IRNCameraWithRef, IRNCameraState> {
     private device : CameraDevice
     
     componentDidMount(): void {
+        console.log('did mount')
         this.setupCamera()
     }
 
@@ -146,7 +147,8 @@ class RNCamera extends PureComponent<IRNCameraWithRef, IRNCameraState> {
         return undefined;
     };
     RenderCamera = () => {
-        return <View style={{ flex: 1 }}>
+        return (
+            <View style={{ flex: 1 }}>
             {
                 (this.state.permissionGranted && this.device) ? <Camera
                     ref={this.props.forwardedRef || this.camera}
@@ -157,15 +159,13 @@ class RNCamera extends PureComponent<IRNCameraWithRef, IRNCameraState> {
                     photo={true}
                     onInitialized={this.onInitialized}
                     onError={this.onError}
-                /> : <this.RenderAwaiting />
+                /> : <View>
+                <Text>Error Loading Camera...</Text>
+            </View>
             }
             {/* <RenderRecordButton /> */}
         </View>
-    }
-    RenderAwaiting = () => {
-        return <View>
-            <Text>Error Loading Camera...</Text>
-        </View>
+        )
     }
 
     // const RenderRecordButton = () => {
@@ -194,11 +194,10 @@ class RNCamera extends PureComponent<IRNCameraWithRef, IRNCameraState> {
     render() {
         return (
             <>
-                <this.RenderCamera />
-
+                {this.RenderCamera() }
             </>
         )
     }
 
 };
-export default RNCamera
+export default RNCamera;

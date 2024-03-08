@@ -8,8 +8,8 @@ export const HomeScreen = () => {
         openCamera: false
     })
     const rnRef = React.createRef<Camera>();
-    const [isRecording, setRecording] = useState(false);
-    
+    // const [isRecording, setRecording] = useState(false);
+    const {isRecording, recordVideo, stopRecording, setIsRecording, setCameraRef} = useCamera()
     return <View style={{ flex: 1 }}>
         <View style={{ padding: 8 }}>
 
@@ -17,30 +17,32 @@ export const HomeScreen = () => {
 
             {state.openCamera && !isRecording && <Button title="Record" onPress={async () => {
                 if(!isRecording){
-                    // setRecording(true)
-                    let video = await  new Promise((resolve, reject) => {
-                        rnRef.current?.startRecording({
-                        onRecordingFinished: (video) => {
-                            resolve(video)
-                            setRecording(false)
-                        },
-                        onRecordingError: (error) => {
-                            console.log(error)
-                            reject(error)
-                            setRecording(false)
-                        },
+                    setIsRecording(true)
+                    let video = await recordVideo().catch((error)=>{
+                        console.log(error)
                     })
-                });
-                console.log('recorded : ', video)
+                    console.log('video ',video);
+                    // let video = await  new Promise((resolve, reject) => {
+                    //         rnRef.current?.startRecording({
+                    //         onRecordingFinished: (video) => {
+                    //             resolve(video)
+                    //             setIsRecording(false)
+                    //         },
+                    //         onRecordingError: (error) => {
+                    //             console.log(error)
+                    //             reject(error)
+                    //             setIsRecording(false)
+                    //         },
+                    //     })
+                    // });
                 }
                 
             }} />}
             
             {isRecording && <Button title="Stop" onPress={async () => {
-                await rnRef.current?.stopRecording()
+                await stopRecording()
             }} />}
         </View>
-        {/* {state.openCamera && <RNCamera forwardedRef={rnRef} ></RNCamera>} */}
-        <RNCamera forwardedRef={rnRef} ></RNCamera>
+        {state.openCamera && <RNCamera forwardedRef={(ref:any)=>{setCameraRef(ref)}} ></RNCamera>}
     </View>
 }
